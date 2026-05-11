@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <title>WARZONE 3D</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --orange: #ff6a00;
+      --red: #ff1a1a;
+      --gold: #ffd700;
+      --cyan: #00e5ff;
+      --dark: #0a0a0f;
+      --panel: rgba(10,12,20,0.92);
+      --border: rgba(255,106,0,0.35);
+      --glow: 0 0 18px rgba(255,106,0,0.6);
+    }
+    * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    body { background:#000; overflow:hidden; font-family:'Rajdhani',sans-serif; color:#fff; touch-action:none; }
+
+    /* ── DESKTOP CURSOR ── */
+    #custom-cursor {
+      position:fixed; width:16px; height:16px; pointer-events:none; z-index:99999;
+      transform:translate(-50%,-50%);
+    }
+    #custom-cursor::before {
+      content:''; position:absolute; inset:0; border:2px solid var(--orange);
+      border-radius:50%; animation:cursorPulse 1.5s ease-in-out infinite;
+    }
+    #custom-cursor::after {
+      content:''; position:absolute; top:50%; left:50%; width:3px; height:3px;
+      background:var(--orange); border-radius:50%; transform:translate(-50%,-50%);
+    }
+    @keyframes cursorPulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.4);opacity:0.6} }
+    @media (pointer:coarse) { #custom-cursor { display:none; } body { cursor:default; } }
+
+    /* ── LOADING ── */
+    #loading-screen {
+      position:fixed; inset:0; background:radial-gradient(ellipse at center, #0d0d1a 0%, #000 100%);
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      z-index:9999; transition:opacity 1.2s ease;
+    }
+    #loading-logo {
+      font-family:'Orbitron'; font-size:clamp(2rem,8vw,5rem); font-weight:900; letter-spacing:clamp(4px,2vw,12px);
+      background:linear-gradient(135deg,#ff1a1a,#ff6a00,#ffd700);
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+      filter:drop-shadow(0 0 30px rgba(255,106,0,0.8));
+      animation:logoPulse 2s ease-in-out infinite; margin-bottom:0.5rem;
+    }
+    @keyframes logoPulse { 0%,100%{filter:drop-shadow(0 0 30px rgba(255,106,0,0.8))} 50%{filter:drop-shadow(0 0 60px rgba(255,106,0,1))} }
+    #loading-sub { font-family:'Share Tech Mono'; font-size:clamp(0.55rem,2vw,0.75rem); color:#ff6a00; letter-spacing:4px; margin-bottom:3rem; text-align:center; padding:0 1rem; }
+    #loading-bar-wrap { width:min(420px,80vw); padding:2px; border:1px solid rgba(255,106,0,0.3); border-radius:2px; background:rgba(255,106,0,0.05); }
+    #loading-bar { height:4px; width:0%; background:linear-gradient(90deg,#ff1a1a,#ff6a00,#ffd700); border-radius:1px; transition:width 0.35s ease; }
+    #loading-pct { font-family:'Orbitron'; font-size:1.6rem; font-weight:900; color:#ff6a00; margin-top:1.2rem; }
+    #loading-text { font-family:'Share Tech Mono'; font-size:0.7rem; color:#666; margin-top:0.4rem; letter-spacing:3px; }
+    .loading-scanline { position:absolute; inset:0; background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.08) 3px,rgba(0,0,0,0.08) 4px); pointer-events:none; }
+
+    /* ── LOBBY ── */
+    #lobby-screen {
+      position:fixed; inset:0; display:none; flex-direction:column; align-items:center; justify-content:flex-start;
+      background:radial-gradient(ellipse at 50% 30%,#0f0f25 0%,#000 100%); z-index:1000;
+      overflow-y:auto; overflow-x:hidden; padding:1rem 0 2rem;
+    }
+    .lobby-bg-grid {
+      position:fixed; inset:0; opacity:0.06; pointer-events:none;
+      background-image:linear-gradient(rgba(255,106,0,1) 1px,transparent 1px),linear-gradient(90deg,rgba(255,106,0,1) 1px,transparent 1px);
+      background-size:60px 60px; animation:gridScroll 8s linear infinite;
+    }
+    @keyframes gridScroll { 0%{background-position:0 0} 100%{background-position:60px 60px} }
+    .lobby-bg-vignette { position:fixed; inset:0; background:radial-gradient(ellipse at center,transparent 30%,#000 100%); pointer-events:none; }
+    #lobby-title {
+      font-family:'Orbitron'; font-size:clamp(2rem,8vw,4.5rem); font-weight:900; letter-spacing:clamp(4px,2vw,14px);
+      background:linear-gradient(135deg,#ff1a1a,#ff6a00,#ffd700);
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+      filter:drop-shadow(0 0 40px rgba(255,106,0,0.9));
+      margin-bottom:0.3rem; position:relative; z-index:1; margin-top:0.5rem;
+    }
+    #lobby-tagline { font-family:'Share Tech Mono'; font-size:clamp(0.5rem,2vw,0.7rem); color:#ff6a00; letter-spacing:4px; margin-bottom:1.5rem; position:relative; z-index:1; text-align:center; }
+    .lobby-main { display:flex; flex-wrap:wrap; gap:1rem; align-items:flex-start; justify-content:center; position:relative; z-index:1; padding:0 1rem; width:100%; max-width:720px; }
+    .lobby-panel {
+      background:rgba(8,10,20,0.95); border:1px solid var(--border);
+      border-radius:4px; padding:1.2rem; backdrop-filter:blur(20px);
+      box-shadow:0 0 40px rgba(255,106,0,0.1), inset 0 1px 0 rgba(255,106,0,0.15);
+      flex:1; min-width:280px; max-width:340px;
+    }
+    .panel-title { font-family:'Orbitron'; font-size:0.65rem; letter-spacing:4px; color:#ff6a00; margin-bottom:1rem; display:flex; align-items:center; gap:0.6rem; }
+    .panel-title::before { content:''; display:block; width:20px; height:1px; background:#ff6a00; }
+    .input-group { display:flex; flex-direction:column; gap:0.8rem; }
+    .hd-input {
+      background:rgba(255,255,255,0.03); border:1px solid rgba(255,106,0,0.2);
+      color:#fff; padding:13px 16px; border-radius:3px; font-family:'Share Tech Mono';
+      font-size:0.9rem; outline:none; transition:all 0.25s; letter-spacing:1px; width:100%;
+    }
+    .hd-input:focus { border-color:#ff6a00; background:rgba(255,106,0,0.06); box-shadow:0 0 15px rgba(255,106,0,0.15); }
+    .hd-input::placeholder { color:#333; }
+    .btn-hd {
+      padding:13px 24px; border:none; border-radius:3px; cursor:pointer;
+      font-family:'Orbitron'; font-weight:700; font-size:0.75rem; letter-spacing:3px;
+      transition:all 0.2s; text-transform:uppercase; position:relative; overflow:hidden; width:100%;
+    }
+    .btn-primary-hd { background:linear-gradient(135deg,#cc3300,#ff6a00); color:#fff; box-shadow:0 4px 20px rgba(255,106,0,0.4); }
+    .btn-primary-hd:hover,.btn-primary-hd:active { transform:translateY(-2px); box-shadow:0 8px 30px rgba(255,106,0,0.7); }
+    .btn-secondary-hd { background:rgba(255,255,255,0.04); color:#888; border:1px solid rgba(255,255,255,0.1); }
+    .btn-secondary-hd:hover,.btn-secondary-hd:active { background:rgba(255,255,255,0.08); color:#fff; border-color:rgba(255,106,0,0.4); }
+    .anim-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:0.5rem; }
+    .anim-opt { padding:8px 4px; border-radius:3px; cursor:pointer; text-align:center; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.02); font-family:'Rajdhani'; font-size:0.75rem; transition:all 0.2s; }
+    .anim-opt:active,.anim-opt.selected { border-color:#ff6a00; background:rgba(255,106,0,0.18); color:#ff6a00; }
+    .anim-icon { font-size:1.4rem; display:block; margin-bottom:3px; }
+    .loadout-slots { display:grid; grid-template-columns:repeat(4,1fr); gap:0.5rem; }
+    .loadout-slot { border:1px solid rgba(255,255,255,0.1); border-radius:3px; padding:8px 4px; text-align:center; background:rgba(255,255,255,0.02); font-family:'Share Tech Mono'; font-size:0.6rem; color:#555; transition:all 0.2s; cursor:pointer; min-height:54px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; }
+    .loadout-slot.filled { border-color:rgba(255,106,0,0.35); color:#ff8844; }
+    .loadout-slot.active-slot { border-color:#ff6a00; background:rgba(255,106,0,0.12); }
+    .loadout-slot .ls-icon { font-size:1.2rem; }
+
+    /* ── CANVAS ── */
+    #game-canvas { display:block; width:100vw; height:100vh; }
+
+    /* ── HUD ── */
+    #hud { position:fixed; inset:0; pointer-events:none; z-index:100; display:none; }
+
+    /* Crosshair */
+    #crosshair-wrap { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:24px; height:24px; pointer-events:none; }
+    .ch-line { position:absolute; background:rgba(255,255,255,0.92); box-shadow:0 0 3px rgba(0,0,0,0.9); }
+    .ch-top    { width:2px; height:8px; top:0;    left:50%; transform:translateX(-50%); }
+    .ch-bottom { width:2px; height:8px; bottom:0; left:50%; transform:translateX(-50%); }
+    .ch-left   { height:2px; width:8px; left:0;   top:50%;  transform:translateY(-50%); }
+    .ch-right  { height:2px; width:8px; right:0;  top:50%;  transform:translateY(-50%); }
+    .ch-dot    { width:3px; height:3px; background:#ff4444; border-radius:50%; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); box-shadow:0 0 4px #ff4444; }
+    #crosshair-wrap.spread .ch-top    { top:-4px; }
+    #crosshair-wrap.spread .ch-bottom { bottom:-4px; }
+    #crosshair-wrap.spread .ch-left   { left:-4px; }
+    #crosshair-wrap.spread .ch-right  { right:-4px; }
+
+    #hit-marker { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:28px; height:28px; pointer-events:none; opacity:0; }
+    #hit-marker::before,#hit-marker::after { content:''; position:absolute; background:#ff2222; box-shadow:0 0 6px #ff0000; }
+    #hit-marker::before { width:100%; height:2px; top:50%; left:0; transform:translateY(-50%) rotate(45deg); }
+    #hit-marker::after  { width:2px; height:100%; left:50%; top:0; transform:translateX(-50%) rotate(45deg); }
+    #hit-marker.flash { animation:hitFlash 0.18s ease; }
+    @keyframes hitFlash { 0%,100%{opacity:0} 50%{opacity:1} }
+
+    #damage-vignette { position:absolute; inset:0; background:radial-gradient(ellipse at center,transparent 35%,rgba(255,0,0,0.55) 100%); opacity:0; pointer-events:none; }
+    #damage-vignette.flash { animation:damageVig 0.55s ease; }
+    @keyframes damageVig { 0%,100%{opacity:0} 25%{opacity:1} }
+    #low-health-vignette { position:absolute; inset:0; background:radial-gradient(ellipse at center,transparent 30%,rgba(255,0,0,0.3) 100%); opacity:0; pointer-events:none; transition:opacity 0.5s; }
+    #low-health-vignette.active { animation:lowHealthPulse 1.2s ease-in-out infinite; }
+    @keyframes lowHealthPulse { 0%,100%{opacity:0} 50%{opacity:1} }
+    #slide-vignette { position:absolute; inset:0; pointer-events:none; opacity:0; background:radial-gradient(ellipse at center bottom,transparent 40%,rgba(0,0,0,0.5) 100%); transition:opacity 0.2s; }
+    #slide-vignette.active { opacity:1; }
+    #ads-overlay { position:absolute; inset:0; pointer-events:none; opacity:0; transition:opacity 0.15s; background:rgba(0,0,0,0.2); }
+    #ads-overlay.active { opacity:1; }
+    #ads-scope-ring { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:0; height:0; border-radius:50%; border:0 solid rgba(0,0,0,0); transition:all 0.15s; }
+    #ads-overlay.active #ads-scope-ring { width:200px; height:200px; border:80px solid rgba(0,0,0,0.85); }
+
+    /* Bottom HUD */
+    #bottom-hud { position:absolute; bottom:0; left:0; right:0; padding:clamp(10px,3vw,20px) clamp(12px,4vw,28px); display:flex; justify-content:space-between; align-items:flex-end; }
+    #health-section { display:flex; flex-direction:column; gap:4px; }
+    #health-label { font-family:'Share Tech Mono'; font-size:clamp(0.45rem,1.5vw,0.55rem); letter-spacing:3px; color:#ff4444; }
+    #health-num { font-family:'Orbitron'; font-size:clamp(1.8rem,6vw,2.8rem); font-weight:900; line-height:1; color:#ff4444; text-shadow:0 0 20px rgba(255,50,50,0.8); transition:color 0.3s; }
+    #health-bar-bg { width:clamp(100px,25vw,180px); height:5px; background:rgba(255,255,255,0.08); border-radius:2px; overflow:hidden; border:1px solid rgba(255,255,255,0.05); }
+    #health-bar { height:100%; width:100%; border-radius:1px; transition:width 0.3s ease, background 0.5s; }
+    #ammo-section { text-align:right; }
+    #ammo-mag { font-family:'Orbitron'; font-size:clamp(2rem,7vw,3.2rem); font-weight:900; line-height:1; color:#fff; }
+    #ammo-sep { font-family:'Orbitron'; font-size:clamp(1rem,3.5vw,1.8rem); color:#444; }
+    #ammo-res { font-family:'Orbitron'; font-size:clamp(0.9rem,2.5vw,1.4rem); color:#666; vertical-align:bottom; }
+    #weapon-name-hud { font-family:'Share Tech Mono'; font-size:clamp(0.5rem,1.5vw,0.65rem); letter-spacing:3px; color:#ff6a00; margin-top:3px; }
+    #fire-mode-hud { font-family:'Share Tech Mono'; font-size:clamp(0.45rem,1.3vw,0.55rem); letter-spacing:2px; color:#555; margin-top:1px; }
+
+    #weapon-bar { position:absolute; bottom:clamp(70px,14vw,90px); left:50%; transform:translateX(-50%); display:flex; gap:5px; }
+    .hud-slot { width:clamp(44px,11vw,58px); height:clamp(44px,11vw,58px); background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.1); border-radius:3px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:0.5rem; color:#555; transition:all 0.15s; }
+    .hud-slot.active { border-color:#ff6a00; background:rgba(255,106,0,0.15); box-shadow:0 0 12px rgba(255,106,0,0.4); color:#ff8844; }
+    .hud-slot .hs-num { font-family:'Orbitron'; font-size:0.45rem; color:#444; }
+    .hud-slot .hs-icon { font-size:1.2rem; margin:1px 0; }
+    .hud-slot .hs-ammo { font-family:'Share Tech Mono'; font-size:0.45rem; color:#555; }
+    .hud-slot.active .hs-num { color:#ff6a00; }
+    .hud-slot.active .hs-ammo { color:#ff8844; }
+
+    #kill-feed { position:absolute; top:clamp(60px,12vw,80px); right:clamp(8px,2vw,20px); display:flex; flex-direction:column; gap:4px; align-items:flex-end; }
+    .kill-entry { background:rgba(0,0,0,0.82); padding:4px 10px; border-radius:2px; font-family:'Rajdhani'; font-size:clamp(0.7rem,2.2vw,0.88rem); border-left:2px solid #ff4444; animation:kfSlide 0.25s ease, kfFade 0.5s ease 3.5s forwards; display:flex; gap:6px; align-items:center; }
+    @keyframes kfSlide { from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:translateX(0)} }
+    @keyframes kfFade  { to{opacity:0;transform:translateX(20px)} }
+    .kill-entry.my-kill { border-left-color:#ff6a00; }
+    .ke-killer { color:#ff8800; font-weight:700; }
+    .ke-victim { color:#999; }
+
+    #scoreboard { position:absolute; top:clamp(8px,2vw,16px); left:clamp(8px,2vw,16px); background:rgba(0,0,0,0.7); padding:10px 14px; border-radius:3px; border:1px solid rgba(255,106,0,0.2); min-width:140px; backdrop-filter:blur(10px); }
+    #scoreboard h4 { font-family:'Orbitron'; font-size:0.5rem; letter-spacing:3px; color:#ff6a00; margin-bottom:6px; }
+    .sc-entry { font-family:'Rajdhani'; font-size:clamp(0.75rem,2.3vw,0.9rem); display:flex; justify-content:space-between; gap:12px; padding:2px 0; border-bottom:1px solid rgba(255,255,255,0.04); }
+    .sc-entry:last-child { border-bottom:none; }
+    .sc-entry.me { color:#ff8800; }
+    .sc-kills { color:#ff4444; font-weight:700; font-family:'Orbitron'; font-size:0.7rem; }
+
+    #reload-indicator { position:absolute; bottom:clamp(110px,22vw,130px); left:50%; transform:translateX(-50%); font-family:'Orbitron'; font-size:0.65rem; letter-spacing:3px; color:#ff6a00; background:rgba(0,0,0,0.75); padding:5px 16px; border-radius:2px; opacity:0; transition:opacity 0.2s; border:1px solid rgba(255,106,0,0.3); display:flex; flex-direction:column; align-items:center; gap:4px; }
+    #reload-indicator.show { opacity:1; }
+    #reload-bar-bg { width:120px; height:2px; background:rgba(255,255,255,0.1); border-radius:1px; overflow:hidden; }
+    #reload-bar-fill { height:100%; width:0%; background:linear-gradient(90deg,#ff4444,#ff6a00); transition:width 0.08s linear; }
+
+    #ammo-warning { position:absolute; bottom:clamp(90px,18vw,110px); right:clamp(12px,3vw,28px); font-family:'Share Tech Mono'; font-size:0.55rem; letter-spacing:3px; color:#ff4444; opacity:0; transition:opacity 0.3s; animation:ammoBlink 0.6s ease-in-out infinite; }
+    @keyframes ammoBlink { 0%,100%{opacity:0.3} 50%{opacity:1} }
+    #ammo-warning.show { opacity:1; }
+
+    #mini-compass { position:absolute; top:clamp(8px,2vw,16px); right:clamp(8px,2vw,16px); width:60px; height:60px; border-radius:50%; border:1px solid rgba(255,106,0,0.3); background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; backdrop-filter:blur(8px); }
+    #compass-needle { width:2px; height:24px; background:linear-gradient(0deg,#ff4444 50%,rgba(255,255,255,0.3) 50%); transform-origin:50% 100%; border-radius:2px 2px 0 0; }
+    .compass-ring-label { position:absolute; font-family:'Orbitron'; font-size:0.4rem; color:#555; }
+    .crl-n { top:3px; left:50%; transform:translateX(-50%); color:#ff4444; }
+    .crl-s { bottom:3px; left:50%; transform:translateX(-50%); }
+    .crl-e { right:4px; top:50%; transform:translateY(-50%); }
+    .crl-w { left:4px; top:50%; transform:translateY(-50%); }
+
+    #stance-indicator { position:absolute; bottom:clamp(130px,26vw,160px); left:clamp(12px,3vw,28px); font-family:'Share Tech Mono'; font-size:0.55rem; letter-spacing:2px; color:#666; display:flex; flex-direction:column; gap:2px; }
+    .stance-icon { font-size:1rem; opacity:0.4; transition:opacity 0.2s; }
+    .stance-icon.active { opacity:1; color:#ff6a00; }
+
+    #sprint-bar-wrap { position:absolute; bottom:clamp(78px,16vw,88px); right:clamp(12px,3vw,28px); display:flex; flex-direction:column; align-items:flex-end; gap:3px; opacity:0; transition:opacity 0.3s; }
+    #sprint-bar-wrap.show { opacity:1; }
+    #sprint-label { font-family:'Share Tech Mono'; font-size:0.45rem; letter-spacing:2px; color:#888; }
+    #sprint-bar-bg { width:50px; height:3px; background:rgba(255,255,255,0.08); border-radius:2px; overflow:hidden; }
+    #sprint-bar-fill { height:100%; width:100%; background:#00e5ff; border-radius:2px; transition:width 0.1s linear; }
+
+    /* ── MOBILE TOUCH CONTROLS ── */
+    #mobile-controls {
+      position:fixed; inset:0; pointer-events:none; z-index:150;
+      display:none; /* shown only on touch devices via JS */
+    }
+
+    /* Left joystick zone */
+    #joystick-zone {
+      position:absolute; bottom:clamp(80px,18vw,110px); left:clamp(12px,3vw,20px);
+      width:clamp(120px,28vw,160px); height:clamp(120px,28vw,160px);
+      pointer-events:all;
+    }
+    #joystick-base {
+      width:100%; height:100%; border-radius:50%;
+      background:rgba(255,255,255,0.06); border:2px solid rgba(255,106,0,0.3);
+      position:relative;
+    }
+    #joystick-knob {
+      width:40%; height:40%; border-radius:50%;
+      background:rgba(255,106,0,0.5); border:2px solid rgba(255,106,0,0.8);
+      position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+      box-shadow:0 0 12px rgba(255,106,0,0.4);
+      transition:transform 0.05s;
+    }
+
+    /* Right look zone (invisible, covers right half) */
+    #look-zone {
+      position:absolute; top:0; right:0;
+      width:55%; height:75%;
+      pointer-events:all;
+    }
+
+    /* Fire button */
+    #btn-fire {
+      position:absolute; bottom:clamp(80px,18vw,110px); right:clamp(12px,3vw,20px);
+      width:clamp(72px,17vw,90px); height:clamp(72px,17vw,90px); border-radius:50%;
+      background:radial-gradient(circle,rgba(200,30,30,0.9),rgba(120,10,10,0.95));
+      border:3px solid rgba(255,50,50,0.7); pointer-events:all;
+      display:flex; align-items:center; justify-content:center;
+      font-family:'Orbitron'; font-size:clamp(0.55rem,1.8vw,0.7rem); font-weight:900;
+      color:#fff; letter-spacing:1px;
+      box-shadow:0 0 20px rgba(255,50,50,0.4), inset 0 0 10px rgba(255,100,100,0.2);
+      text-shadow:0 0 8px #ff0000;
+      flex-direction:column; gap:2px;
+    }
+    #btn-fire.firing { background:radial-gradient(circle,rgba(255,100,50,0.95),rgba(200,30,0,1)); box-shadow:0 0 35px rgba(255,80,0,0.8); }
+    #btn-fire-icon { font-size:clamp(1.4rem,4vw,1.8rem); }
+
+    /* Reload button */
+    #btn-reload {
+      position:absolute; bottom:clamp(170px,36vw,215px); right:clamp(18px,4vw,28px);
+      width:clamp(52px,12vw,64px); height:clamp(52px,12vw,64px); border-radius:50%;
+      background:rgba(255,106,0,0.15); border:2px solid rgba(255,106,0,0.5);
+      pointer-events:all; display:flex; align-items:center; justify-content:center;
+      flex-direction:column; gap:1px;
+      font-family:'Orbitron'; font-size:0.45rem; color:#ff6a00; letter-spacing:1px;
+    }
+    #btn-reload-icon { font-size:clamp(1.1rem,3vw,1.4rem); }
+
+    /* Jump button */
+    #btn-jump {
+      position:absolute; bottom:clamp(170px,36vw,215px); right:clamp(88px,20vw,112px);
+      width:clamp(48px,11vw,60px); height:clamp(48px,11vw,60px); border-radius:50%;
+      background:rgba(0,200,255,0.12); border:2px solid rgba(0,200,255,0.4);
+      pointer-events:all; display:flex; align-items:center; justify-content:center;
+      flex-direction:column; gap:1px;
+      font-family:'Orbitron'; font-size:0.4rem; color:#00ccff;
+    }
+    #btn-jump-icon { font-size:clamp(1rem,2.8vw,1.2rem); }
+
+    /* ADS button */
+    #btn-ads {
+      position:absolute; bottom:clamp(170px,36vw,215px); right:clamp(158px,36vw,188px);
+      width:clamp(48px,11vw,60px); height:clamp(48px,11vw,60px); border-radius:50%;
+      background:rgba(255,255,255,0.06); border:2px solid rgba(255,255,255,0.2);
+      pointer-events:all; display:flex; align-items:center; justify-content:center;
+      flex-direction:column; gap:1px;
+      font-family:'Orbitron'; font-size:0.4rem; color:#aaa;
+    }
+    #btn-ads.active { background:rgba(0,200,255,0.15); border-color:rgba(0,200,255,0.5); color:#00ccff; }
+    #btn-ads-icon { font-size:clamp(1rem,2.8vw,1.2rem); }
+
+    /* Weapon slots touch */
+    #touch-weapon-bar {
+      position:absolute; bottom:clamp(80px,18vw,110px);
+      left:50%; transform:translateX(-50%);
+      display:flex; gap:6px; pointer-events:all;
+    }
+    .touch-wslot {
+      width:clamp(40px,10vw,52px); height:clamp(40px,10vw,52px);
+      background:rgba(0,0,0,0.65); border:1px solid rgba(255,255,255,0.12);
+      border-radius:4px; display:flex; flex-direction:column; align-items:center;
+      justify-content:center; font-size:0.45rem; color:#555;
+    }
+    .touch-wslot.active { border-color:#ff6a00; background:rgba(255,106,0,0.18); color:#ff8844; box-shadow:0 0 10px rgba(255,106,0,0.3); }
+    .touch-wslot .tw-icon { font-size:1.1rem; }
+    .touch-wslot .tw-num  { font-family:'Orbitron'; font-size:0.4rem; }
+
+    /* ── SCREENS ── */
+    #kill-anim-overlay { position:fixed; inset:0; pointer-events:none; z-index:200; overflow:hidden; }
+    .kill-text-3d { position:absolute; font-family:'Orbitron'; font-weight:900; font-size:clamp(1.4rem,5vw,2.2rem); letter-spacing:5px; pointer-events:none; text-shadow:0 0 30px currentColor; animation:killText3d 1.8s cubic-bezier(0.2,0.8,0.3,1) forwards; }
+    @keyframes killText3d { 0%{opacity:0;transform:translate(-50%,-50%) scale(0.3)} 20%{opacity:1;transform:translate(-50%,-60%) scale(1.3)} 60%{opacity:1;transform:translate(-50%,-80%) scale(1)} 100%{opacity:0;transform:translate(-50%,-120%) scale(0.8)} }
+
+    #death-screen { position:fixed; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; background:rgba(180,0,0,0.12); backdrop-filter:blur(6px) grayscale(0.7); z-index:600; }
+    #death-title { font-family:'Orbitron'; font-size:clamp(2.5rem,10vw,5rem); font-weight:900; color:#ff1a1a; letter-spacing:8px; text-shadow:0 0 60px rgba(255,0,0,0.8); animation:deathPulse 0.8s ease-in-out infinite alternate; }
+    @keyframes deathPulse { from{text-shadow:0 0 30px rgba(255,0,0,0.5)} to{text-shadow:0 0 80px rgba(255,0,0,1)} }
+    #death-killer { font-family:'Share Tech Mono'; font-size:clamp(0.7rem,2.5vw,0.9rem); color:#888; letter-spacing:3px; margin-top:0.5rem; }
+    #respawn-count { font-family:'Orbitron'; font-size:clamp(1.1rem,4vw,1.8rem); color:#cc4444; margin-top:1.5rem; letter-spacing:4px; }
+
+    /* Desktop pointer lock message — hidden on mobile */
+    #pointer-lock-msg { position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.85); z-index:300; flex-direction:column; gap:1.2rem; backdrop-filter:blur(4px); }
+    #pointer-lock-msg h2 { font-family:'Orbitron'; font-size:clamp(1rem,4vw,1.8rem); color:#ff6a00; letter-spacing:4px; text-align:center; }
+    #pointer-lock-msg p  { color:#666; font-family:'Share Tech Mono'; font-size:clamp(0.65rem,2vw,0.8rem); line-height:1.8; text-align:center; letter-spacing:1px; padding:0 1rem; }
+    @media (pointer:coarse) { #pointer-lock-msg { display:none !important; } }
+
+    #weapon-select-screen { position:fixed; inset:0; display:none; flex-direction:column; align-items:center; justify-content:flex-start; background:rgba(0,0,0,0.96); z-index:500; backdrop-filter:blur(12px); overflow-y:auto; padding:1rem; }
+    #weapon-select-screen h2 { font-family:'Orbitron'; font-size:clamp(0.9rem,3vw,1.4rem); letter-spacing:5px; color:#ff6a00; margin-bottom:1rem; margin-top:0.5rem; }
+    .weapon-cats { display:flex; gap:0.5rem; margin-bottom:1rem; flex-wrap:wrap; justify-content:center; }
+    .cat-btn { padding:6px 14px; border-radius:2px; border:1px solid rgba(255,106,0,0.25); background:transparent; color:#777; font-family:'Orbitron'; font-size:0.6rem; letter-spacing:2px; cursor:pointer; }
+    .cat-btn:active,.cat-btn.active { border-color:#ff6a00; color:#ff6a00; background:rgba(255,106,0,0.08); }
+    .weapons-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:0.6rem; width:100%; max-width:700px; }
+    .weapon-card { background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:3px; padding:0.7rem 0.5rem; cursor:pointer; text-align:center; }
+    .weapon-card:active,.weapon-card.selected { border-color:#ff6a00; background:rgba(255,106,0,0.08); box-shadow:0 0 10px rgba(255,106,0,0.3); }
+    .wc-icon { font-size:1.8rem; margin-bottom:4px; }
+    .wc-name { font-family:'Orbitron'; font-size:0.55rem; letter-spacing:2px; color:#ff8844; }
+    .stat-bar { display:flex; align-items:center; gap:3px; margin-top:2px; justify-content:center; }
+    .stat-bar-bg { width:36px; height:2px; background:rgba(255,255,255,0.1); border-radius:1px; overflow:hidden; }
+    .stat-bar-fill { height:100%; background:linear-gradient(90deg,#ff4444,#ff6a00); border-radius:1px; }
+
+    #player-labels { position:fixed; inset:0; pointer-events:none; z-index:50; }
+    .float-label { position:absolute; background:rgba(0,0,0,0.75); padding:2px 7px; border-radius:2px; font-family:'Share Tech Mono'; font-size:0.65rem; color:#fff; pointer-events:none; transform:translate(-50%,-100%); white-space:nowrap; border:1px solid rgba(255,255,255,0.1); }
+    .float-label.enemy { border-color:rgba(255,50,50,0.4); color:#ffaaaa; }
+    .float-label.bot   { color:#ffcc88; border-color:rgba(255,150,0,0.3); }
+    .float-label-hp { height:2px; margin-top:2px; border-radius:1px; background:linear-gradient(90deg,#ff4444,#ff8800); transition:width 0.3s; }
+
+    #notif { position:fixed; bottom:clamp(150px,32vw,170px); left:50%; transform:translateX(-50%); font-family:'Share Tech Mono'; font-size:0.7rem; color:#ff8800; background:rgba(0,0,0,0.8); padding:5px 18px; border-radius:2px; letter-spacing:2px; z-index:300; pointer-events:none; border:1px solid rgba(255,106,0,0.3); opacity:0; transition:opacity 0.3s; white-space:nowrap; }
+
+    @keyframes screenShake { 0%,100%{transform:none} 10%{transform:translate(-3px,2px) rotate(-0.5deg)} 30%{transform:translate(3px,-2px) rotate(0.5deg)} 50%{transform:translate(-2px,1px) rotate(-0.3deg)} 70%{transform:translate(2px,-1px) rotate(0.3deg)} 90%{transform:translate(-1px,0)} }
+    #game-canvas.shake { animation:screenShake 0.4s ease; }
+  </style>
+</head>
+<body>
+
+<div id="custom-cursor"></div>
+
+<!-- LOADING -->
+<div id="loading-screen">
+  <div class="loading-scanline"></div>
+  <div id="loading-logo">WARZONE 3D</div>
+  <div id="loading-sub">HD MULTIPLAYER TACTICAL SHOOTER</div>
+  <div id="loading-bar-wrap"><div id="loading-bar"></div></div>
+  <div id="loading-pct">0%</div>
+  <div id="loading-text">INITIALIZING SYSTEMS...</div>
+</div>
+
+<!-- LOBBY -->
+<div id="lobby-screen">
+  <div class="lobby-bg-grid"></div>
+  <div class="lobby-bg-vignette"></div>
+  <div id="lobby-title">WARZONE 3D</div>
+  <div id="lobby-tagline">▸ HD MULTIPLAYER TACTICAL SHOOTER ◂</div>
+  <div class="lobby-main">
+    <div class="lobby-panel">
+      <div class="panel-title">PLAYER SETUP</div>
+      <div class="input-group">
+        <input class="hd-input" id="player-name-input" type="text" placeholder="ENTER CALLSIGN" maxlength="16" autocomplete="off"/>
+        <input class="hd-input" id="room-id-input" type="text" placeholder="ROOM ID (blank = random)" maxlength="20" autocomplete="off"/>
+        <button class="btn-hd btn-primary-hd" onclick="window.joinGame()">⚡ JOIN BATTLE</button>
+        <button class="btn-hd btn-secondary-hd" onclick="window.createRoom()">＋ CREATE ROOM</button>
+      </div>
+      <div style="margin-top:1.2rem;">
+        <div class="panel-title">KILL ANIMATION</div>
+        <div class="anim-grid">
+          <div class="anim-opt selected" data-anim="ice"    onclick="window.selectAnim(this)"><span class="anim-icon">❄️</span>ICE</div>
+          <div class="anim-opt"          data-anim="fire"   onclick="window.selectAnim(this)"><span class="anim-icon">🔥</span>FIRE</div>
+          <div class="anim-opt"          data-anim="magma"  onclick="window.selectAnim(this)"><span class="anim-icon">🌋</span>MAGMA</div>
+          <div class="anim-opt"          data-anim="earth"  onclick="window.selectAnim(this)"><span class="anim-icon">🪨</span>EARTH</div>
+          <div class="anim-opt"          data-anim="galaxy" onclick="window.selectAnim(this)"><span class="anim-icon">🌌</span>GALAXY</div>
+          <div class="anim-opt"          data-anim="air"    onclick="window.selectAnim(this)"><span class="anim-icon">💨</span>AIR</div>
+        </div>
+      </div>
+    </div>
+    <div class="lobby-panel">
+      <div class="panel-title">LOADOUT</div>
+      <div class="loadout-slots" id="lobby-loadout-slots">
+        <div class="loadout-slot active-slot" data-slot="0"><span class="ls-icon">🔫</span><span>SLOT 1</span></div>
+        <div class="loadout-slot" data-slot="1"><span class="ls-icon">🔫</span><span>SLOT 2</span></div>
+        <div class="loadout-slot" data-slot="2"><span class="ls-icon">🔫</span><span>SLOT 3</span></div>
+        <div class="loadout-slot" data-slot="3"><span class="ls-icon">🔫</span><span>SLOT 4</span></div>
+      </div>
+      <div style="margin-top:1rem;">
+        <div class="panel-title">SELECT WEAPON</div>
+        <div class="weapon-cats" id="weapon-cats-lobby"></div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.4rem;max-height:200px;overflow-y:auto;" id="weapons-grid-lobby"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CANVAS -->
+<canvas id="game-canvas"></canvas>
+
+<!-- PLAYER LABELS -->
+<div id="player-labels"></div>
+
+<!-- HUD -->
+<div id="hud">
+  <div id="crosshair-wrap">
+    <div class="ch-line ch-top"></div><div class="ch-line ch-bottom"></div>
+    <div class="ch-line ch-left"></div><div class="ch-line ch-right"></div>
+    <div class="ch-dot"></div>
+  </div>
+  <div id="hit-marker"></div>
+  <div id="damage-vignette"></div>
+  <div id="low-health-vignette"></div>
+  <div id="slide-vignette"></div>
+  <div id="ads-overlay"><div id="ads-scope-ring"></div></div>
+  <div id="bottom-hud">
+    <div id="health-section">
+      <div id="health-label">HEALTH</div>
+      <div id="health-num">100</div>
+      <div id="health-bar-bg"><div id="health-bar"></div></div>
+    </div>
+    <div id="weapon-bar">
+      <div class="hud-slot active" id="hslot-0"><div class="hs-num">1</div><div class="hs-icon">🔫</div><div class="hs-ammo">30</div></div>
+      <div class="hud-slot" id="hslot-1"><div class="hs-num">2</div><div class="hs-icon">🔫</div><div class="hs-ammo">—</div></div>
+      <div class="hud-slot" id="hslot-2"><div class="hs-num">3</div><div class="hs-icon">🔫</div><div class="hs-ammo">—</div></div>
+      <div class="hud-slot" id="hslot-3"><div class="hs-num">4</div><div class="hs-icon">🔫</div><div class="hs-ammo">—</div></div>
+    </div>
+    <div id="ammo-section">
+      <div><span id="ammo-mag">30</span><span id="ammo-sep"> / </span><span id="ammo-res">90</span></div>
+      <div id="weapon-name-hud">M4A1</div>
+      <div id="fire-mode-hud">● AUTO</div>
+    </div>
+  </div>
+  <div id="kill-feed"></div>
+  <div id="scoreboard"><h4>🏆 SCORE</h4><div id="score-list"></div></div>
+  <div id="reload-indicator">RELOADING<div id="reload-bar-bg"><div id="reload-bar-fill"></div></div></div>
+  <div id="stance-indicator">
+    <div class="stance-icon active" id="si-stand">🧍</div>
+    <div class="stance-icon" id="si-slide">🏃</div>
+    <div class="stance-icon" id="si-prone">🤸</div>
+  </div>
+  <div id="sprint-bar-wrap">
+    <div id="sprint-label">STAMINA</div>
+    <div id="sprint-bar-bg"><div id="sprint-bar-fill"></div></div>
+  </div>
+  <div id="mini-compass">
+    <div class="compass-ring-label crl-n">N</div>
+    <div class="compass-ring-label crl-s">S</div>
+    <div class="compass-ring-label crl-e">E</div>
+    <div class="compass-ring-label crl-w">W</div>
+    <div id="compass-needle"></div>
+  </div>
+  <div id="ammo-warning">⚠ LOW AMMO</div>
+</div>
+
+<!-- MOBILE TOUCH CONTROLS -->
+<div id="mobile-controls">
+  <!-- Left: virtual joystick -->
+  <div id="joystick-zone">
+    <div id="joystick-base">
+      <div id="joystick-knob"></div>
+    </div>
+  </div>
+  <!-- Right: look zone (invisible touch area) -->
+  <div id="look-zone"></div>
+  <!-- Action buttons -->
+  <div id="btn-fire"><div id="btn-fire-icon">🔫</div>FIRE</div>
+  <div id="btn-reload"><div id="btn-reload-icon">🔄</div>RELOAD</div>
+  <div id="btn-jump"><div id="btn-jump-icon">⬆️</div>JUMP</div>
+  <div id="btn-ads"><div id="btn-ads-icon">🎯</div>ADS</div>
+</div>
+
+<!-- POINTER LOCK (desktop only) -->
+<div id="pointer-lock-msg">
+  <h2>CLICK TO ENTER BATTLE</h2>
+  <p>WASD — Move &nbsp;|&nbsp; MOUSE — Look &nbsp;|&nbsp; LMB — Shoot<br>R — Reload &nbsp;|&nbsp; C — Slide &nbsp;|&nbsp; SPACE — Jump<br>SHIFT — Sprint &nbsp;|&nbsp; 1-4 — Switch Weapon &nbsp;|&nbsp; RMB — ADS</p>
+  <button class="btn-hd btn-primary-hd" style="width:auto;padding:12px 32px;" onclick="window.requestPointerLock()">ENTER BATTLE</button>
+</div>
+
+<!-- WEAPON SELECT -->
+<div id="weapon-select-screen">
+  <h2>SELECT LOADOUT</h2>
+  <div class="weapon-cats" id="weapon-cats-ingame"></div>
+  <div class="weapons-grid" id="weapons-grid-ingame"></div>
+  <button class="btn-hd btn-primary-hd" style="max-width:300px;margin-top:1rem;" onclick="window.closeWeaponSelect()">✔ CONFIRM</button>
+</div>
+
+<!-- DEATH SCREEN -->
+<div id="death-screen">
+  <div id="death-title">YOU DIED</div>
+  <div id="death-killer"></div>
+  <div id="respawn-count">RESPAWNING IN 5...</div>
+</div>
+
+<!-- KILL ANIM OVERLAY -->
+<div id="kill-anim-overlay"></div>
+
+<!-- NOTIFICATION -->
+<div id="notif"></div>
+
+<!-- Firebase -->
+<script type="module" src="src/firebase-config.js"></script>
+<!-- Three.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- Game Scripts -->
+<script type="module" src="src/weapons.js"></script>
+<script type="module" src="src/animations.js"></script>
+<script type="module" src="src/game.js"></script>
+
+<script>
+  // Desktop custom cursor
+  const cur = document.getElementById('custom-cursor');
+  document.addEventListener('mousemove', e => {
+    cur.style.left = e.clientX + 'px';
+    cur.style.top  = e.clientY + 'px';
+  });
+</script>
+</body>
+</html>
